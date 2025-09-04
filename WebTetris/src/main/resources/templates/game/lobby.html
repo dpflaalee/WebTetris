@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{fragments/layout}">
+<head>
+    <meta charset="UTF-8">
+    <title>대기실</title>
+    <!-- SockJS & STOMP 라이브러리 추가 -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+
+<body>
+
+<div layout:fragment="content">
+<div class="container mt-5" style="width: 60%;">
+    <!-- 방 생성 -->
+    <div class="d-flex mb-3" >
+        <div class="flex-grow-1 m-2"><input style="width: 100%; border: 1px solid #eee; padding: 8px; border-radius: 8px;"
+        	 type="number" id="maxPlayers" placeholder="최대 인원" min="2" max="4"></div>
+        <div class="m-2"><button class="btn btn-primary" style="font-weight: bold;" onclick="createRoom()">방 생성</button></div>
+    </div>
+
+    <!-- 방 목록 -->
+    <div class=" m-2 card p-3 bg-light" style="border: none;"><div id="roomList">
+        <h3 style="font-weight: bold;">GAME ROOM</h3>
+        <ul id="rooms"  class="list-group mt-3"></ul>
+    </div>
+    
+	<!-- 방 상세 -->
+	<div id="roomDetail" style="display: none; border: none;" class="card mt-1 p-4">
+	  <h5 style="font-weight: bold; font-size: 1em;">방 정보: <span id="roomIdDisplay"></span></h5>
+	  <ul id="participants" class="list-group mt-3"></ul>
+	
+	  <div id="roomActions" class="mt-3">
+	    <button id="joinBtn" class="btn btn-success">참여하기</button>
+	    <button id="readyBtn" class="btn btn-warning">준비 완료</button>
+	    <button id="startBtn" class="btn btn-primary">게임 시작</button>
+	    <button id="leaveBtn" class="btn btn-secondary">나가기</button>
+	    <button id="deleteBtn" class="btn btn-danger">방 삭제</button>
+	  </div>
+	</div></div>
+</div>
+<!-- ///////////////////////////////////////////////////////////////////////////////////////////// -->
+
+    <!-- JavaScript -->
+    <script th:inline="javascript"> 
+    let stompClient;
+    let userId = [[${userId != null ? userId : '"guest"'}]];
+    let currentRoomId = null;
+    let previewRoomId = null;
+    let subscriptions = {}; 
+
+    window.addEventListener("DOMContentLoaded", () => { connectWebSocket(); });
+
+    //웹소켓 연결
+    function connectWebSocket() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, () => {
+            console.log("[DEBUG] WebSocket 연결 완료됨");
+
+            stompClient.subscribe('/topic/rooms', updateRoomList);
+            stompClient.subscribe('/user/room/info', (message) => {
+                const data = JSON.parse(message.body);
+                const room = {
+                    roomId: data.roomId,
+                    hostId: data.hostId,
+                    maxPlayers: data.maxPlayers,
+                    participants: data.participants
+                };
+                const isHost = data.isHost;
+                const isParticipant = data.isParticipant;
+                const isJoined = data.isJoined;
+
+                updateRoomUI(room);
+            });
+            stompClient.send("/app/room/list", {}, {});
+        });
+    }
+
+    //방 생성 함수
+    function createRoom() {
+        if (currentRoomId) { const confirmCreate = confirm("새 방을 만들면 기존 방에서 나가게 됩니다. 계속하시겠습니까?"); if (!confirmCreate) return; }
+
+        const max = document.getElementById("maxPlayers").value;
+        const roomRequest = { hostId: userId, maxPlayers: parseInt(max) };
+        stompClient.send("/app/room/create", {}, JSON.stringify(roomRequest));
+    }
+
+    //방 상세정보
+    function viewRoom(roomId) {
+    	//console.log("[DEBUG] 상세보기 클릭됨 - roomId:", roomId);
+        previewRoomId = roomId;
+
+        const topic = `/topic/room/${roomId}`;
+        if (!subscriptions[topic]) {
+            subscriptions[topic] = stompClient.subscribe(topic, (message) => {
+                const data = JSON.parse(message.body);
+                const room = {
+                    roomId: data.roomId,
+                    hostId: data.hostId,
+                    maxPlayers: data.maxPlayers,
+                    participants: data.participants
+                };
+
+                updateRoomUI(room);
+            });
+        }
+        
+        //console.log("[DEBUG] /app/room/info 메시지 전송 - userId:", userId);
+        stompClient.send("/app/room/info", {}, JSON.stringify({ roomId, userId }));
+    }
+    
+    //참여
+    function joinRoom(roomId) {
+        currentRoomId = roomId;
+
+        stompClient.send("/app/room/join", {}, JSON.stringify({ roomId, userId }));
+
+        const topic = `/topic/room/${roomId}`;
+        if (!subscriptions[topic]) {
+            subscriptions[topic] = stompClient.subscribe(topic, (message) => {
+                const room = JSON.parse(message.body);
+                updateRoomUI(room);
+            });
+        }
+
+        const startTopic = `/topic/room/${roomId}/start`;
+        if (!subscriptions[startTopic]) {
+            subscriptions[startTopic] = stompClient.subscribe(startTopic, () => {
+                //alert("게임이 시작되었습니다!");
+                window.location.href = `/game/multi?roomId=${roomId}&userId=${userId}`;
+            });
+        }
+    }
+
+    //준비상태 전송
+    function sendReady() {
+        if (!currentRoomId) { alert("현재 참여 중인 방이 없습니다."); return; }
+        stompClient.send("/app/room/ready", {}, JSON.stringify({ roomId: currentRoomId, userId }));
+        
+        //오류방지용 딜레이
+        setTimeout(() => { viewRoom(currentRoomId); }, 300);
+    }
+    
+    //게임시작
+    function startGame() { 
+        if (!currentRoomId) { alert("방에 참여한 후 시작할 수 있습니다."); return; }
+    	stompClient.send("/app/room/start", {}, JSON.stringify({ roomId: currentRoomId, userId })); }
+
+    //떠나기
+    function leaveRoom() {
+        if (!currentRoomId) { alert("현재 참여 중인 방이 없습니다."); return; }
+
+        if (!confirm("정말로 방에서 나가시겠습니까?")) return;
+
+        stompClient.send("/app/room/leave", {}, JSON.stringify({ roomId: currentRoomId, userId }));
+        currentRoomId = null;
+        document.getElementById("roomDetail").style.display = "none";
+    }
+
+    //삭제
+    function deleteRoom() {
+    	if (!confirm("정말로 방을 삭제하시겠습니까?")) return;
+
+        stompClient.send("/app/room/delete", {}, JSON.stringify({ roomId: currentRoomId, userId:userId }));
+        currentRoomId = null;
+        document.getElementById("roomDetail").style.display = "none";
+    }
+
+    //방 리스트
+    function updateRoomList(message) {
+        const rooms = JSON.parse(message.body);
+        const list = document.getElementById("rooms");
+        list.innerHTML = "";
+
+        rooms.forEach((room, index) => {
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between align-items-center";
+            const participantCount = Object.keys(room.participants).length;
+            li.innerHTML = `방 #${index + 1} (${participantCount}/${room.maxPlayers}) 
+                <button class="btn btn-info" onclick="viewRoom('${room.roomId}')">상세 보기</button>`;
+            list.appendChild(li);
+        });
+    }
+
+    function updateRoomUI(room) {
+    	const currentUser = room.participants.find(p => p.userId === userId);
+        const isJoined = !!currentUser;
+        const isHost = room.hostId === userId;
+        const isReady = currentUser?.ready ?? false;
+        const allReady = room.participants.every(p => p.ready);
+
+        currentRoomId = isJoined ? room.roomId : currentRoomId;
+
+        document.getElementById("roomDetail").style.display = "block";
+        document.getElementById("roomIdDisplay").textContent = room.roomId;
+
+        // 참가자 목록 렌더링
+        const list = document.getElementById("participants");
+        list.innerHTML = "";
+        room.participants.forEach(p => {
+            const li = document.createElement("li");
+            li.className = "list-group-item d-flex justify-content-between align-items-center";
+            
+            li.innerHTML = `
+                <div>
+                    <strong>${p.userId}</strong>
+                    ${p.userId === room.hostId ? '<span class="badge bg-primary ms-2">방장</span>' : ''}
+                </div>
+                <span class="text-muted">${p.ready ? "준비됨" : "대기 중"}</span>
+            `;
+            list.appendChild(li);
+        });
+
+        // 버튼 표시 조건
+        const show = (id, condition) => {
+            document.getElementById(id).style.display = condition ? "inline-block" : "none";
+        };
+
+        show("joinBtn", !isJoined);
+        show("readyBtn", isJoined);
+        show("startBtn", isJoined && isHost);
+        show("deleteBtn", isJoined && isHost);
+        show("leaveBtn", isJoined);
+
+        // 버튼 상태 및 이벤트
+        document.getElementById("readyBtn").textContent = isReady ? "준비 취소" : "준비 완료";
+        document.getElementById("startBtn").disabled = !(isHost && allReady);
+
+        document.getElementById("joinBtn").onclick = () => joinRoom(room.roomId);
+        document.getElementById("readyBtn").onclick = () => sendReady();
+        document.getElementById("startBtn").onclick = () => startGame();
+        document.getElementById("leaveBtn").onclick = () => leaveRoom();
+        document.getElementById("deleteBtn").onclick = () => deleteRoom();
+
+        // 게임 시작 메시지 구독
+        const startTopic = `/topic/room/${room.roomId}/start`;
+        if (!subscriptions[startTopic]) {
+            subscriptions[startTopic] = stompClient.subscribe(startTopic, () => {
+                window.location.href = `/game/multi?roomId=${room.roomId}&userId=${userId}`;
+            });
+        }
+    }
+    </script>
+</div>
+</body>
+</html>

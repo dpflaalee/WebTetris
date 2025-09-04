@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html  lang="ko"     xmlns:th="http://www.thymeleaf.org"  
+                   xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+                   layout:decorate="~{fragments/layout}">
+<head>
+<meta charset="UTF-8">
+<title>Tetris Game</title>
+<style>canvas{border:1px solid black;}</style>
+<script type="module" src="/js/single-game.js"></script>
+</head>
+<body>
+<div layout:fragment="content">
+	<div class="container p-5">
+		<div class="d-flex justify-content-center">
+			<div class="p-3">
+				<div id="gameOverMessage" style="display:none; color:red; font-size:24px;">GAME OVER</div>
+				<canvas id="gameCanvas" width="300" height="600"></canvas>
+			</div>
+			<div class="d-flex flex-column justify-content-between">
+				<div class="d-flex flex-column p-3 gap-3">
+					<canvas id="previewCanvas" width="100" height="100"></canvas>
+					<div class="card p-3">
+						<p class="mb-2">ID:<span th:text="${name}"></span></p>
+						<p style="margin: 0;">점수: <span id="score" th:text="${score}">0</span></p>
+					</div>
+				</div>
+				<div class="d-flex flex-column p-3 gap-2">
+					<button id="pauseResumeBtn" class="btn btn-block btn-info">일시 정지</button>
+					<button id = "startRestartBtn" class="btn btn-block btn-primary">게임 시작</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+</body>
+</html>

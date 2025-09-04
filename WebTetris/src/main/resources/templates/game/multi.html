@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{fragments/layout}">
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+<style>
+    #container { gap: 24px; padding: 24px; }
+    #left { gap: 12px; }
+    #overlay {
+      position: fixed; inset: 0; display: none;
+      align-items: center; justify-content: center; /* backdrop-filter: blur(2px); */
+      background: rgba(0,0,0,0.2); z-index: 10;
+      pointer-events: none;
+    }
+    #overlay .msg {
+      background: #fff; padding: 24px 32px; border-radius: 12px; font-size: 20px; font-weight: bold;
+      border: 1px solid #eee; box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      pointer-events: auto;
+    }
+</style>
+
+  <!-- SockJS & STOMP -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<div layout:fragment="content">
+
+<div class="container">
+  <div class="d-flex" id="container">
+  <!-- 내 보드 -->
+    <div id="left"class="d-flex" >
+      <div class="p-3" style="border: 1px solid #eee; border-radius: 10px;">
+        <p class="p-1 mb-1"><span id="me-id"></span></p> <canvas id="my-canvas" width="300" height="600"></canvas>
+      </div>
+
+      <div>
+        <div class="mb-3 p-3" style="border: 1px solid #eee; border-radius: 10px;">점수: <span id="my-score">0</span></div>
+        <div class="p-3" style="border: 1px solid #eee; border-radius: 10px;">
+        	<p>다음 블록</p> <canvas id="my-next" width="100" height="100"></canvas>
+        </div>
+      </div>
+    </div>
+
+	<!-- 상대 보드 -->
+	<div id="right" class="flex-grow-1 flex-fill">
+	  <div id="opponents" style="gap:16px;" class="d-flex p-1 flex-fill">
+	    <div th:each="user : ${participants}" th:if="${user.userId != userID}" class="opponent" th:attr="data-user-id=${user.userId}">
+	      
+	      <div class="p-3" style="background-color: white; border-radius: 10px; border: 1px solid #eee;">
+	      	<div class="label" th:text="${user.userId}">userId</div>
+	      	<canvas class="canvas" width="200" height="400"></canvas>
+	      	<div class="score">점수: 0</div>
+	      </div>
+	      
+	    </div>
+	  </div>
+	</div>
+    
+  </div>
+</div>
+
+<div class="container p-3">
+	<button id="pauseResumeBtn" class="btn btn-warning w-100" style="display: none;">일시 정지</button>
+	<div id="overlay"><div class="msg"></div></div>
+</div>
+
+  <!-- URL 쿼리에서 roomId, userId 읽기 -->
+  <script>
+    (function ensureQuery() {
+      const params = new URLSearchParams(location.search);
+      if (!params.get('roomId') || !params.get('userId')) { console.warn('roomId 혹은 userId 인식오류'); }
+    })();
+  </script>
+
+<script type="module" src="/js/multi-game.js"></script>
+
+</div>
+</body>
+</html>

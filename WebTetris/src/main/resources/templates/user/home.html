@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html  lang="ko"     xmlns:th="http://www.thymeleaf.org"  
+                   xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+                   layout:decorate="~{fragments/layout}">
+<head>
+  <meta charset="UTF-8">
+  <title>Tetris Game</title>
+</head>
+<body>
+<div layout:fragment="content">
+  <div class="container mt-5 p-5" style="text-align: center; width: 60%;">
+    <h2 class="mb-5" style="font-weight: bold;" 
+    th:text="'환영합니다, ' + ${name} + '님!'"></h2>
+    <!-- <a href="/user/login">로그아웃</a> -->
+    <div class="d-grid gap-3">
+    	<a class="btn btn-block p-3" style="font-weight: bold; border: 2px solid #eee;" href="/game/home">솔로 플레이</a>
+    	<a class="btn btn-primary btn-block p-3" style="font-weight: bold;" href="/game/lobby">멀티 플레이</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

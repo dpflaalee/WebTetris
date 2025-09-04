@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html  lang="ko"     xmlns:th="http://www.thymeleaf.org"  
+					 xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+
+<head>
+<meta charset="UTF-8">
+<title>Tetris Game</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</head>
+
+<body>
+
+	<!-- header.html th:replace 삽입  -->
+	<th:block th:replace="fragments/header::header" />
+	<!-- content.html layout:fragment 교체 -->
+	<th:block layout:fragment="content" />
+
+</body>
+
+</html>
+<!-- layout -->
